@@ -1,0 +1,6 @@
+{
+  "name": "Alpaca",
+  "capabilities": ["sync_transactions", "sync_positions", "execute_actions"],
+  "supported_actions": ["buy", "sell"],
+  "config_fields": ["api_key", "api_secret", "endpoint"]
+}

@@ -1,0 +1,6 @@
+{
+  "name": "Envelope Budget",
+  "capabilities": ["sync_transactions", "sync_positions"],
+  "supported_actions": [],
+  "config_fields": ["base_url"]
+}

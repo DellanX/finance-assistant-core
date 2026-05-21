@@ -1,0 +1,6 @@
+{
+  "name": "HomeAssistant",
+  "capabilities": ["sync_transactions"],
+  "supported_actions": [],
+  "config_fields": ["url", "token"]
+}
