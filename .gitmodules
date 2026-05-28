@@ -1,3 +1,3 @@
 [submodule "frontend-dev"]
 	path = frontend-dev
-	url = ../finance-assistant-frontend
+	url = https://github.com/DellanX/finance-assistant-frontend.git

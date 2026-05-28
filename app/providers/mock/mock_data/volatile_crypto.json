@@ -1,0 +1,40 @@
+{
+    "id": "mock_volatile_crypto",
+    "name": "Mock Volatile Crypto Exchange",
+    "accounts": [
+        {
+            "id": "account_crypto_1",
+            "name": "Trading Wallet",
+            "type": "investment",
+            "balance": 12500.00,
+            "currency": "USD"
+        }
+    ],
+    "transactions": {
+        "account_crypto_1": [
+            {
+                "id": "tx_c1",
+                "date": "2026-05-18",
+                "amount": -500.00,
+                "merchant": "BTC Purchase",
+                "status": "settled"
+            }
+        ]
+    },
+    "positions": {
+        "account_crypto_1": [
+            {
+                "symbol": "BTC",
+                "quantity": 0.5,
+                "cost_basis": 30000.00,
+                "current_price": 65000.00
+            },
+            {
+                "symbol": "ETH",
+                "quantity": 4.0,
+                "cost_basis": 2000.00,
+                "current_price": 3500.00
+            }
+        ]
+    }
+}

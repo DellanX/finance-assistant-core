@@ -1,0 +1,15 @@
+{
+    "id": "mock_custom_64ce77fe",
+    "name": "test4",
+    "config": {
+        "enable_balances": true,
+        "enable_transactions": true,
+        "enable_budgets": false
+    },
+    "accounts": [],
+    "transactions": {},
+    "positions": {},
+    "enable_balances": true,
+    "enable_transactions": true,
+    "enable_budgets": false
+}

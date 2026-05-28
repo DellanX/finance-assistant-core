@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   backend:
@@ -24,6 +24,8 @@ services:
       - ./frontend-dev:/app
     ports:
       - "5173:5173"
+    environment:
+      - VITE_API_URL=http://backend:8000
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0"
 
   # Example Postgres integration (commented out by default, using SQLite instead)

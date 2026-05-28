@@ -1,0 +1,19 @@
+{
+  "name": "Finance Assistant Dev Container",
+  "dockerComposeFile": ["../docker-compose.dev.yml"],
+  "service": "backend",
+  "workspaceFolder": "/app",
+  "shutdownAction": "stopCompose",
+  "forwardPorts": [8000, 5173],
+  "extensions": [
+    "ms-python.python",
+    "ms-python.vscode-pylance",
+    "ms-azuretools.vscode-docker"
+  ],
+  "settings": {
+    "python.languageServer": "Pylance",
+    "python.formatting.provider": "black"
+  },
+  "postCreateCommand": "pip install -e .[dev]",
+  "remoteUser": "root"
+}

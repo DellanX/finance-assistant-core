@@ -1,5 +1,6 @@
-from sqlalchemy import Column, String, JSON
+from sqlalchemy import Column, String
 from app.db.base import Base
+
 
 class Ledger(Base):
     __tablename__ = "ledgers"
