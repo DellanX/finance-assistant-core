@@ -40,8 +40,6 @@ async def delete_tag(tag_key: str):
     if not ok:
         raise HTTPException(status_code=404, detail="tag not found")
 
-router = APIRouter()
-
 
 @router.get("", response_model=TagListResponse)
 async def list_tags():

@@ -23,6 +23,8 @@ build-backend = "setuptools.build_meta"
 dev = [
     "pytest",
     "httpx",
+    "pytest-asyncio",
+    "pytest-cov",
     "mypy",
     "ruff"
 ]

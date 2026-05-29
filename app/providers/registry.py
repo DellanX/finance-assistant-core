@@ -40,6 +40,11 @@ def add_provider(provider_instance: BaseProvider, config: ProviderConfig = None)
     pid = getattr(provider_instance, "id", None)
     if pid is None:
         raise ValueError("provider instance must have an `id` attribute")
+    # wrap provider instance methods to apply normalizers when available
+    try:
+        provider_instance = _wrap_provider_normalizers(provider_instance)
+    except Exception:
+        pass
     active_providers[pid] = provider_instance
     if config is not None:
         provider_configs[pid] = config
@@ -74,6 +79,10 @@ def load_integrations():
                 found = module.load_providers()
                 if isinstance(found, dict):
                     for pid, provider in found.items():
+                        try:
+                            provider = _wrap_provider_normalizers(provider)
+                        except Exception:
+                            pass
                         active_providers[pid] = provider
             except Exception:
                 continue
@@ -83,6 +92,58 @@ def load_integrations():
 
 def get_provider(provider_id: str) -> BaseProvider:
     return active_providers.get(provider_id)
+
+
+def _wrap_provider_normalizers(provider: BaseProvider) -> BaseProvider:
+    """Wrap common provider methods to apply normalization helpers when available.
+
+    This decorates `discover_accounts`, `sync_transactions`, and `sync_positions`
+    to run the corresponding normalizer from `app.providers.helpers` when the
+    provider returns raw dicts/lists.
+    """
+    try:
+        from app.providers.helpers import (
+            normalize_accounts,
+            normalize_transactions,
+            normalize_positions,
+        )
+    except Exception:
+        normalize_accounts = normalize_transactions = normalize_positions = None
+
+    def _maybe_normalize(fn, normalizer):
+        if not callable(fn):
+            return fn
+
+        async def wrapper(*args, **kwargs):
+            res = fn(*args, **kwargs)
+            # await if coroutine
+            if inspect.iscoroutine(res):
+                res = await res
+            # if no normalizer available, return as-is
+            if normalizer is None:
+                return res
+            # If result is a list of dicts, normalize
+            try:
+                if isinstance(res, list) and (not res or isinstance(res[0], dict)):
+                    return normalizer(res)
+            except Exception:
+                pass
+            return res
+
+        return wrapper
+
+    try:
+        if hasattr(provider, "discover_accounts"):
+            provider.discover_accounts = _maybe_normalize(provider.discover_accounts, normalize_accounts)
+        if hasattr(provider, "sync_transactions"):
+            provider.sync_transactions = _maybe_normalize(provider.sync_transactions, normalize_transactions)
+        if hasattr(provider, "sync_positions"):
+            provider.sync_positions = _maybe_normalize(provider.sync_positions, normalize_positions)
+    except Exception:
+        # best-effort; if wrapping fails, return original provider
+        return provider
+
+    return provider
 
 def register_provider_config(config: ProviderConfig):
     """Register or replace a provider configuration record."""

@@ -40,8 +40,6 @@ async def delete_category(category_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="category not found")
 
-router = APIRouter()
-
 
 @router.get("", response_model=CategoryListResponse)
 async def list_categories():

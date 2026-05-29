@@ -40,6 +40,8 @@ def get_integration_schema(integration: str):
         raise HTTPException(status_code=500, detail="failed to load integration schema")
 from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
+from app.core.schemas import NormalizedTransaction, NormalizedLedger, NormalizedAccount, NormalizedTranche
+from typing import List
 
 
 class ProviderListItem(BaseModel):
@@ -65,3 +67,25 @@ class ProviderConfigModel(BaseModel):
 class ProviderSchemaResponse(BaseModel):
     provider_id: str
     schema: Optional[Dict[str, Any]]
+
+
+class TransactionResponse(NormalizedTransaction):
+    ledger_id: Optional[str]
+    ledger_name: Optional[str]
+    provider_id: Optional[str]
+    provider_name: Optional[str]
+
+
+class LedgerResponse(NormalizedLedger):
+    provider_id: Optional[str]
+    provider_name: Optional[str]
+
+
+class TrancheResponse(NormalizedTranche):
+    provider_id: Optional[str]
+    provider_name: Optional[str]
+
+
+class AccountResponse(NormalizedAccount):
+    provider_id: Optional[str]
+    provider_name: Optional[str]

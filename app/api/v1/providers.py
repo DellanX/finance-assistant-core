@@ -18,6 +18,7 @@ from .types import (
 )
 from typing import List, Dict, Any
 from fastapi import Response
+from app.api.v1.schemas import AccountResponse
 
 router = APIRouter()
 
@@ -46,21 +47,42 @@ def get_providers():
         result.append({"id": pid, "name": getattr(p, "name", None), "integration": _provider_integration(p)})
     return result
 
-@router.get("/{id}/accounts")
+@router.get("/{id}/accounts", response_model=List[AccountResponse])
 async def get_provider_accounts(id: str):
     provider = get_provider(id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
-    return await provider.discover_accounts()
+    accounts = await provider.discover_accounts()
+    result = []
+    for acc in accounts:
+        if hasattr(acc, "model_dump"):
+            accd = acc.model_dump()
+        elif isinstance(acc, dict):
+            accd = acc
+        else:
+            try:
+                accd = dict(acc)
+            except Exception:
+                accd = {}
+
+        result.append(AccountResponse(
+            id=accd.get("id", ""),
+            name=accd.get("name"),
+            type=accd.get("type"),
+            balance=accd.get("balance", 0.0),
+            provider_id=id,
+            provider_name=provider.name,
+        ))
+    return result
 
 
-@router.get("/{id}")
+@router.get("/{id}", response_model=ProviderResponse)
 def get_provider_metadata(id: str):
     """Return basic provider metadata matching the list representation."""
     provider = get_provider(id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
-    return {"id": id, "name": getattr(provider, "name", None), "integration": _provider_integration(provider)}
+    return ProviderResponse(id=id, name=getattr(provider, "name", None), integration=_provider_integration(provider))
 
 
 @router.get("/{id}/config/schema", response_model=ProviderSchemaResponse)
@@ -76,7 +98,7 @@ def get_provider_config_endpoint(id: str):
     cfg = get_provider_config(id)
     if cfg is None:
         raise HTTPException(status_code=404, detail="Provider config not found")
-    return {"config": cfg.data}
+    return ProviderConfigModel(config=cfg.data)
 
 
 @router.put("/{id}/config", response_model=ProviderConfigModel)
@@ -99,7 +121,7 @@ def update_provider_config(id: str, payload: ProviderConfigModel):
     except Exception:
         persisted = False
 
-    return {"config": cfg.data}
+    return ProviderConfigModel(config=cfg.data)
 
 
 @router.delete("/{id}", status_code=204)
@@ -183,8 +205,8 @@ def create_provider(payload: ProviderCreateRequest):
             pid = getattr(provider, "id", None)
             config_obj = ProviderConfig(provider_id=pid, data=cfg)
             add_provider(provider, config_obj)
-            # Return same shape as GET /api/v1/providers and GET /api/v1/providers/{id}
-            return {"id": pid, "name": getattr(provider, "name", name), "integration": integration}
+            # Return typed ProviderResponse
+            return ProviderResponse(id=pid, name=getattr(provider, "name", name), integration=integration)
     except Exception:
         # fallback to integration-specific handling below
         pass
@@ -258,8 +280,8 @@ def create_provider(payload: ProviderCreateRequest):
 
             add_provider(provider, config_obj)
 
-            # Return same shape as GET /api/v1/providers and GET /api/v1/providers/{id}
-            return {"id": pid, "name": getattr(provider, "name", name), "integration": integration}
+            # Return typed ProviderResponse
+            return ProviderResponse(id=pid, name=getattr(provider, "name", name), integration=integration)
         except HTTPException:
             raise
         except Exception as exc:

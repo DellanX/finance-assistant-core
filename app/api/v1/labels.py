@@ -39,8 +39,6 @@ async def delete_label(label_id: str):
     if not ok:
         raise HTTPException(status_code=404, detail="label not found")
 
-router = APIRouter()
-
 
 @router.get("", response_model=LabelListResponse)
 async def list_labels():

@@ -64,22 +64,59 @@ class MockProvider(BaseProvider):
                     a_copy.pop("balance")
                 result.append(a_copy)
             return result
-        return accounts
+        # Wrap accounts into normalized account models if available
+        try:
+            from app.core.schemas import NormalizedAccount
+            return [NormalizedAccount(**a) for a in accounts]
+        except Exception:
+            return accounts
 
     async def sync_transactions(self, account: Dict[str, Any], since=None) -> List[Dict[str, Any]]:
-        account_id = account.get("id")
+        # support either dict-like or Pydantic model accounts
+        if hasattr(account, "model_dump"):
+            acct = account.model_dump()
+        elif isinstance(account, dict):
+            acct = account
+        else:
+            try:
+                acct = dict(account)
+            except Exception:
+                acct = {}
+
+        account_id = acct.get("id")
         # Returns transactions mapped by account_id
         cfg = self._config()
         if not cfg.get("enable_transactions", True):
             return []
-        return self._state.get("transactions", {}).get(account_id, [])
+        raw = self._state.get("transactions", {}).get(account_id, [])
+        try:
+            from app.providers.normalizers import normalize_transactions
+            # return normalized models (Pydantic) directly
+            return normalize_transactions(raw)
+        except Exception:
+            return raw
 
     async def sync_positions(self, account: Dict[str, Any]) -> List[Dict[str, Any]]:
-        account_id = account.get("id")
+        if hasattr(account, "model_dump"):
+            acct = account.model_dump()
+        elif isinstance(account, dict):
+            acct = account
+        else:
+            try:
+                acct = dict(account)
+            except Exception:
+                acct = {}
+
+        account_id = acct.get("id")
         cfg = self._config()
         if not cfg.get("enable_balances", True):
             return []
-        return self._state.get("positions", {}).get(account_id, [])
+        raw = self._state.get("positions", {}).get(account_id, [])
+        try:
+            from app.providers.normalizers import normalize_positions
+            return normalize_positions(raw)
+        except Exception:
+            return raw
 
     async def list_actions(self) -> List[str]:
         # Return the ids of available actions (combine core + provider-level in registry)

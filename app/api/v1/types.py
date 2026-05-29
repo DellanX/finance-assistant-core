@@ -4,7 +4,7 @@ from pydantic import BaseModel, Field
 
 class ProviderListItem(BaseModel):
     id: str
-    name: Optional[str]
+    name: Optional[str] = None
     integration: Optional[str] = None
 
 
@@ -25,13 +25,13 @@ class ProviderConfigModel(BaseModel):
 
 class ProviderSchemaResponse(BaseModel):
     provider_id: str
-    schema: Optional[Dict[str, Any]]
+    schema: Optional[Dict[str, Any]] = None
 
 
 class ActionDefinition(BaseModel):
     id: str
-    name: Optional[str]
-    description: Optional[str]
+    name: Optional[str] = None
+    description: Optional[str] = None
     integration: Optional[str] = None
     provider_id: Optional[str] = None
     # Note: categories, labels, and tags are separate resources and not embedded here.
@@ -46,13 +46,13 @@ class ActionListResponse(BaseModel):
 
 class CategoryDefinition(BaseModel):
     id: str
-    name: Optional[str]
-    description: Optional[str]
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class TagDefinition(BaseModel):
     key: str
-    description: Optional[str]
+    description: Optional[str] = None
     values: Optional[List[str]] = Field(default_factory=list)
 
 
@@ -66,8 +66,8 @@ class TagListResponse(BaseModel):
 
 class LabelDefinition(BaseModel):
     id: str
-    name: Optional[str]
-    description: Optional[str]
+    name: Optional[str] = None
+    description: Optional[str] = None
 
 
 class LabelListResponse(BaseModel):
@@ -84,3 +84,37 @@ class ActionExecuteResponse(BaseModel):
     status: str
     result: Optional[Any] = None
     error: Optional[str] = None
+
+
+class StrategyDefinition(BaseModel):
+    id: str
+    name: Optional[str] = None
+    description: Optional[str] = None
+
+
+class StrategyListResponse(BaseModel):
+    strategies: List[StrategyDefinition]
+
+
+class SnapshotDefinition(BaseModel):
+    id: str
+    name: Optional[str] = None
+    created_at: Optional[str] = None
+
+
+class SnapshotListResponse(BaseModel):
+    snapshots: List[SnapshotDefinition]
+
+
+class HealthResponse(BaseModel):
+    status: str
+    providers: Dict[str, Any]
+
+
+class MockStateResponse(BaseModel):
+    state: Dict[str, Any]
+
+
+class SimpleStatusResponse(BaseModel):
+    status: str
+    message: Optional[str] = None
