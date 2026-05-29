@@ -1,19 +1,19 @@
 {
   "name": "Finance Assistant Dev Container",
-  "dockerComposeFile": ["../docker-compose.dev.yml"],
+  "dockerComposeFile": ["../docker-compose.yml"],
   "service": "backend",
-  "workspaceFolder": "/app",
+  "runServices": ["backend", "frontend"],
+  "workspaceFolder": "/workspace",
+  "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=cached",
   "shutdownAction": "stopCompose",
   "forwardPorts": [8000, 5173],
+  "overrideCommand": false,
   "extensions": [
     "ms-python.python",
     "ms-python.vscode-pylance",
-    "ms-azuretools.vscode-docker"
+    "esbenp.prettier-vscode",
+    "dbaeumer.vscode-eslint"
   ],
-  "settings": {
-    "python.languageServer": "Pylance",
-    "python.formatting.provider": "black"
-  },
-  "postCreateCommand": "pip install -e .[dev]",
+  "postCreateCommand": "pip install -e /workspace || true",
   "remoteUser": "root"
 }
