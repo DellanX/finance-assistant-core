@@ -1,11 +1,18 @@
 from fastapi import APIRouter
 from fastapi import APIRouter
-from app.api.v1.schemas import TrancheResponse
+from app.api.v1.schemas import TrancheResponse, TrancheListResponse
 
 router = APIRouter()
 
 
-@router.get("", response_model=list[TrancheResponse])
-def get_tranches():
+@router.get("", response_model=TrancheListResponse)
+def get_tranches(limit: int = None, offset: int = None, page: int = None, cursor: str = None, sort_by: str = None, order: str = "asc"):
     # no tranches implemented yet
-    return []
+    items = []
+    from app.api.utils.pagination import sort_items, normalize_pagination, paginate_items, build_paginated_response
+
+    sorted_items = sort_items(items, sort_by, order)
+    lim, off = normalize_pagination(limit, offset, page, cursor)
+    slice_items = paginate_items(sorted_items, lim, off)
+    pag = build_paginated_response(slice_items, total=len(sorted_items), limit=lim, offset=off)
+    return {"tranches": pag["items"], "total": pag["total"], "limit": pag["limit"], "offset": pag["offset"], "next_cursor": pag.get("next_cursor"), "prev_cursor": pag.get("prev_cursor")}

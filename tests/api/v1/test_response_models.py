@@ -7,7 +7,8 @@ def test_transactions_schema(client, mock_provider):
     res = client.get("/api/v1/transactions")
     assert res.status_code == 200
     txs = res.json()
-    for t in txs:
+    tx_list = txs.get("transactions") or txs
+    for t in tx_list:
         # should validate against TransactionResponse
         obj = TransactionResponse(**t)
         assert obj.id is not None
@@ -17,7 +18,8 @@ def test_ledgers_schema(client, mock_provider):
     res = client.get("/api/v1/ledgers")
     assert res.status_code == 200
     items = res.json()
-    for it in items:
+    ledger_list = items.get("ledgers") or items
+    for it in ledger_list:
         obj = LedgerResponse(**it)
         assert obj.id is not None
 
@@ -36,7 +38,8 @@ def test_provider_accounts_schema(client, mock_provider):
     res = client.get(f"/api/v1/providers/{pid}/accounts")
     assert res.status_code == 200
     items = res.json()
-    for it in items:
+    accounts = items.get("accounts") or items
+    for it in accounts:
         obj = AccountResponse(**it)
         assert obj.id is not None
 

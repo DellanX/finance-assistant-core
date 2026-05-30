@@ -11,6 +11,11 @@ active_providers: Dict[str, BaseProvider] = {}
 # Optional per-provider configuration objects (used for UI/editable configs)
 provider_configs: Dict[str, ProviderConfig] = {}
 
+# Pluggable hooks (tests can replace these via the setter helpers below)
+_discover_integration_packages_fn = None
+_import_module_fn = None
+_write_json_file_fn = None
+
 def _discover_integration_packages() -> Dict[str, str]:
     """Return mapping of package name -> filesystem path for each integration package found.
     An integration package is any subdirectory under this providers folder that contains an __init__.py file.
@@ -29,7 +34,8 @@ def _discover_integration_packages() -> Dict[str, str]:
 
 def list_integration_packages():
     """Return list of discovered integration package names."""
-    return list(_discover_integration_packages().keys())
+    discover = _discover_integration_packages_fn or _discover_integration_packages
+    return list(discover().keys())
 
 
 def add_provider(provider_instance: BaseProvider, config: ProviderConfig = None):
@@ -54,7 +60,7 @@ def add_provider(provider_instance: BaseProvider, config: ProviderConfig = None)
         except Exception:
             pass
 
-def load_integrations():
+def load_integrations(discovery_fn=None, import_fn=None):
     """Discover and load providers from integration packages.
 
     Each integration package may expose a `load_providers()` function which should return
@@ -62,13 +68,15 @@ def load_integrations():
     and allows each integration to provide platform-specific code and a coordinator.
     """
     base_pkg = "app.providers"
-    integrations = _discover_integration_packages()
+    discover = discovery_fn or _discover_integration_packages_fn or _discover_integration_packages
+    integrations = discover()
     base_dir = os.path.dirname(__file__)
 
     for pkg_name in integrations.keys():
         module_path = f"{base_pkg}.{pkg_name}"
         try:
-            module = importlib.import_module(module_path)
+            importer = import_fn or _import_module_fn or importlib.import_module
+            module = importer(module_path)
         except Exception:
             # ignore integrations that fail to import for now
             continue
@@ -184,7 +192,8 @@ def persist_provider_config(provider_id: str) -> bool:
         ppath = getattr(provider, "config_path", None)
         if ppath:
             try:
-                if write_json_file(ppath, cfg.data):
+                writer = _write_json_file_fn or write_json_file
+                if writer(ppath, cfg.data):
                     return True
             except Exception:
                 pass
@@ -199,7 +208,8 @@ def persist_provider_config(provider_id: str) -> bool:
         path = inspect.getfile(cls)
         pkg_dir = os.path.dirname(path)
         target = os.path.join(pkg_dir, "config.json")
-        if write_json_file(target, cfg.data):
+        writer = _write_json_file_fn or write_json_file
+        if writer(target, cfg.data):
             return True
     except Exception:
         return False
@@ -270,3 +280,21 @@ def coordinator_statuses():
 
 # Load integrations on import (deferred until registry helpers are available)
 load_integrations()
+
+
+def set_discovery_fn(fn):
+    """Set a custom discovery function for integration packages (for tests)."""
+    global _discover_integration_packages_fn
+    _discover_integration_packages_fn = fn
+
+
+def set_import_module_fn(fn):
+    """Set a custom import function (for tests to simulate integrations)."""
+    global _import_module_fn
+    _import_module_fn = fn
+
+
+def set_write_json_fn(fn):
+    """Set a custom JSON write function (for tests to avoid filesystem I/O)."""
+    global _write_json_file_fn
+    _write_json_file_fn = fn

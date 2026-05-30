@@ -44,6 +44,15 @@ class ActionListResponse(BaseModel):
     actions: List[ActionDefinition]
 
 
+class ProviderListResponse(BaseModel):
+    providers: List[ProviderListItem]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+
+
 class CategoryDefinition(BaseModel):
     id: str
     name: Optional[str] = None
@@ -58,10 +67,20 @@ class TagDefinition(BaseModel):
 
 class CategoryListResponse(BaseModel):
     categories: List[CategoryDefinition]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
 
 
 class TagListResponse(BaseModel):
     tags: List[TagDefinition]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
 
 
 class LabelDefinition(BaseModel):
@@ -72,6 +91,11 @@ class LabelDefinition(BaseModel):
 
 class LabelListResponse(BaseModel):
     labels: List[LabelDefinition]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
 
 
 class ActionExecuteRequest(BaseModel):
@@ -94,6 +118,11 @@ class StrategyDefinition(BaseModel):
 
 class StrategyListResponse(BaseModel):
     strategies: List[StrategyDefinition]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
 
 
 class SnapshotDefinition(BaseModel):
@@ -104,6 +133,15 @@ class SnapshotDefinition(BaseModel):
 
 class SnapshotListResponse(BaseModel):
     snapshots: List[SnapshotDefinition]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+
+
+class ReconcilerListResponse(BaseModel):
+    reconcilers: List[str]
 
 
 class HealthResponse(BaseModel):

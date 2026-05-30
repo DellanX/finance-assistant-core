@@ -73,6 +73,32 @@ Each provider integration must support:
   - "allocation_completed"
   - "strategy_executed"
 
+### Devices & Entities
+To align with Home Assistant's model, the system will expose a small device/entity registry surface:
+
+- Providers register one or more *devices* (logical groupings, e.g., "Alpaca account: primary", "Envelope Budget: household").
+- Each *device* exposes zero or more *entities* (observable/control points that Home Assistant can display or act upon).
+
+Entity semantics and guidance:
+- Entities represent higher-level, meaningful objects in the finance domain that map well to Home Assistant's state model and automations.
+- Entities should be stable, addressable, and meant for user-facing automations and dashboards.
+
+Initial entity types (these SHOULD be exposed as Home Assistant entities):
+- `ledger` — a feed or summary entity representing a provider/account ledger (e.g., recent activity, sync status).
+- `portfolio` — an entity representing an aggregated investment portfolio (net value, performance metrics).
+- `budget` — an entity representing a budget or envelope (planned vs actual, remaining amount).
+- `tranche` — an entity representing a tranche or allocation slice (target, current allocation, drift).
+
+What is NOT an entity:
+- `transaction` objects and `asset` records are NOT entities. They are data model primitives used by APIs, reconciliation, and the allocation engine but are too numerous and granular to be represented as long-lived Home Assistant entities.
+
+Mapping rules:
+- Providers should create device entries that point to the provider-specific resource(s) they manage.
+- Devices may expose multiple entities (for example a brokerage device exposing a `portfolio` entity plus supplementary `ledger`/sync entities).
+- Entities must provide a compact state representation and metadata useful for automations (e.g., numeric attributes for net worth, budget remaining, last_updated timestamps).
+
+This device/entity model enables a concise Home Assistant representation while keeping transaction/asset detail available via API endpoints for investigations and strategies.
+
 ## Data Model Features
 ### Categories
 * Valueless attributes

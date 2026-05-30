@@ -7,6 +7,8 @@ Refactor Tasks (high priority, prepend to roadmap/todo)
 - Make `app.providers.coordinator` lifecycle injectable/testable: expose a pluggable loop/runner or provide sync wrappers so start/stop/refresh can be unit-tested without timing issues.
 - Isolate provider persistence I/O: factor filesystem writes in `app/providers/registry.py` and `app/providers/mock/provider.py` into a small I/O helper so tests can monkeypatch or use a temporary directory without touching package files.
 
+- Improve provider test-injection: refactor providers to accept injectable dependencies (coordinator factory, persistence helper, discovery facade) so unit tests can stub coordinators, avoid filesystem side-effects, and mock dynamic imports.
+
 Summary
 - Inventory of server endpoints completed: scanned `app/docs/FEATURES.md`, `app/main.py`, `app/api/router.py`, and `app/api/v1/*` to collect implemented modules.
 
@@ -35,6 +37,8 @@ Tasks
 - [ ] Add integration tests
 - [ ] Add CI for tests
 - [ ] Document API (OpenAPI / docs)
+- [ ] Document API (OpenAPI / docs) — ensure `/openapi.json` is valid and kept up-to-date for all API changes.
+- [ ] Add OpenAPI verification tests that assert new/changed endpoints are present in the generated spec.
 
 Next steps
 - Scan each `app/api/v1/*.py` to list endpoints and supported operations.

@@ -15,10 +15,12 @@ from .types import (
     ProviderConfigModel,
     ProviderSchemaResponse,
 )
+from .schemas import AccountResponse
 from typing import List, Dict, Any
 from fastapi import Response
 from app.api.v1.schemas import AccountResponse
 from app.providers.persistence import remove_file
+from app.providers import devices as device_registry
 
 router = APIRouter()
 
@@ -32,6 +34,42 @@ register_provider_config = registry.register_provider_config
 persist_provider_config = registry.persist_provider_config
 active_providers = registry.active_providers
 provider_configs = registry.provider_configs
+list_provider_devices = device_registry.list_devices
+
+
+@router.get("")
+def get_providers(limit: int = None, offset: int = None, page: int = None, cursor: str = None, sort_by: str = None, order: str = "asc", name: str = None):
+    """List providers. Backwards compatible: if no pagination/filter params provided,
+    return a simple list. Otherwise return a paginated envelope with cursors.
+    """
+    # Build basic list
+    all_items = []
+    for pid, p in registry.active_providers.items():
+        all_items.append({"id": pid, "name": getattr(p, "name", None), "integration": _provider_integration(p)})
+
+    # Return envelope (Pydantic model) always
+    if limit is None and offset is None and page is None and cursor is None and sort_by is None and name is None:
+        return {"providers": all_items, "total": len(all_items), "limit": None, "offset": 0, "next_cursor": None, "prev_cursor": None}
+
+    # apply filtering
+    from app.api.utils.pagination import (
+        normalize_pagination,
+        apply_filters,
+        sort_items,
+        paginate_items,
+        build_paginated_response,
+    )
+
+    filters = {}
+    if name is not None:
+        filters["name"] = f"*{name}*"
+
+    filtered = apply_filters(all_items, filters)
+    sorted_items = sort_items(filtered, sort_by, order)
+    lim, off = normalize_pagination(limit, offset, page, cursor)
+    slice_items = paginate_items(sorted_items, lim, off)
+    pag = build_paginated_response(slice_items, total=len(sorted_items), limit=lim, offset=off)
+    return {"providers": pag["items"], "total": pag["total"], "limit": pag["limit"], "offset": pag["offset"], "next_cursor": pag.get("next_cursor"), "prev_cursor": pag.get("prev_cursor")}
 
 
 def _provider_integration(provider) -> str:
@@ -51,13 +89,6 @@ def _provider_integration(provider) -> str:
         pass
     return getattr(provider, "integration", None)
 
-@router.get("", response_model=List[ProviderListItem])
-def get_providers():
-    result = []
-    for pid, p in registry.active_providers.items():
-        result.append({"id": pid, "name": getattr(p, "name", None), "integration": _provider_integration(p)})
-    return result
-
 
 @router.get("/schemas")
 def list_provider_schemas():
@@ -70,13 +101,13 @@ def get_integration_schema(integration: str):
     # Deprecated here: schema endpoints moved to /api/v1/schemas/providers/{integration}
     raise HTTPException(status_code=410, detail="moved to /api/v1/schemas/providers/{integration}")
 
-@router.get("/{id}/accounts", response_model=List[AccountResponse])
-async def get_provider_accounts(id: str):
+@router.get("/{id}/accounts")
+async def get_provider_accounts(id: str, limit: int = None, offset: int = None, page: int = None, cursor: str = None, sort_by: str = None, order: str = "asc"):
     provider = registry.get_provider(id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
     accounts = await provider.discover_accounts()
-    result = []
+    items = []
     for acc in accounts:
         if hasattr(acc, "model_dump"):
             accd = acc.model_dump()
@@ -88,24 +119,23 @@ async def get_provider_accounts(id: str):
             except Exception:
                 accd = {}
 
-        result.append(AccountResponse(
-            id=accd.get("id", ""),
-            name=accd.get("name"),
-            type=accd.get("type"),
-            balance=accd.get("balance", 0.0),
-            provider_id=id,
-            provider_name=provider.name,
-        ))
-    return result
+        items.append({
+            "id": accd.get("id", ""),
+            "name": accd.get("name"),
+            "type": accd.get("type"),
+            "balance": accd.get("balance", 0.0),
+            "provider_id": id,
+            "provider_name": provider.name,
+        })
 
+    from app.api.utils.pagination import sort_items, normalize_pagination, paginate_items, build_paginated_response
 
-@router.get("/{id}", response_model=ProviderResponse)
-def get_provider_metadata(id: str):
-    """Return basic provider metadata matching the list representation."""
-    provider = get_provider(id)
-    if not provider:
-        raise HTTPException(status_code=404, detail="Provider not found")
-    return ProviderResponse(id=id, name=getattr(provider, "name", None), integration=_provider_integration(provider))
+    sorted_items = sort_items(items, sort_by, order)
+    lim, off = normalize_pagination(limit, offset, page, cursor)
+    slice_items = paginate_items(sorted_items, lim, off)
+    pag = build_paginated_response(slice_items, total=len(sorted_items), limit=lim, offset=off)
+    return {"accounts": pag["items"], "total": pag["total"], "limit": pag["limit"], "offset": pag["offset"], "next_cursor": pag.get("next_cursor"), "prev_cursor": pag.get("prev_cursor")}
+
 
 
 @router.get("/{id}/config/schema", response_model=ProviderSchemaResponse)
@@ -145,6 +175,17 @@ def update_provider_config(id: str, payload: ProviderConfigModel):
         persisted = False
 
     return ProviderConfigModel(config=cfg.data)
+
+
+
+# Move the simple metadata endpoint after the more-specific config/schema endpoints
+@router.get("/{id}", response_model=ProviderResponse)
+def get_provider_metadata(id: str):
+    """Return basic provider metadata matching the list representation."""
+    provider = get_provider(id)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return ProviderResponse(id=id, name=getattr(provider, "name", None), integration=_provider_integration(provider))
 
 
 @router.delete("/{id}", status_code=204)
@@ -209,7 +250,8 @@ def create_provider(payload: ProviderCreateRequest):
 
     # Try to use integration-provided factory
     try:
-        mod = importlib.import_module(f"app.providers.{integration}")
+        importer = getattr(registry, "_import_module_fn", None) or importlib.import_module
+        mod = importer(f"app.providers.{integration}")
         if hasattr(mod, "create_provider"):
             provider = mod.create_provider(cfg, provider_id=provided_id, name=name)
             # if provider factory also returned config info, try to register
@@ -247,7 +289,8 @@ def create_provider(payload: ProviderCreateRequest):
                 json.dump(state, f, indent=4)
 
             # instantiate provider
-            provider_mod = importlib.import_module("app.providers.mock.provider")
+            importer = getattr(registry, "_import_module_fn", None) or importlib.import_module
+            provider_mod = importer("app.providers.mock.provider")
             ProviderClass = None
             for v in vars(provider_mod).values():
                 try:
@@ -281,7 +324,8 @@ def create_provider(payload: ProviderCreateRequest):
             # Register config object
             # prefer integration-specific config class if present
             try:
-                cfg_mod = importlib.import_module("app.providers.mock.config")
+                importer = getattr(registry, "_import_module_fn", None) or importlib.import_module
+                cfg_mod = importer("app.providers.mock.config")
                 if hasattr(cfg_mod, "MockProviderConfig"):
                     config_obj = cfg_mod.MockProviderConfig(provider_id=pid, data=cfg)
                 else:
@@ -299,3 +343,22 @@ def create_provider(payload: ProviderCreateRequest):
             raise HTTPException(status_code=500, detail=str(exc))
 
     raise HTTPException(status_code=400, detail="creation for this integration is not supported")
+
+
+@router.get("/{id}/devices")
+def get_provider_devices(id: str):
+    provider = registry.get_provider(id)
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+
+    devices = device_registry.list_devices(id)
+
+    def to_dict(m):
+        if hasattr(m, "model_dump"):
+            return m.model_dump()
+        try:
+            return m.dict()
+        except Exception:
+            return {}
+
+    return {"devices": [to_dict(d) for d in devices]}

@@ -89,3 +89,39 @@ class TrancheResponse(NormalizedTranche):
 class AccountResponse(NormalizedAccount):
     provider_id: Optional[str]
     provider_name: Optional[str]
+
+
+class AccountListResponse(BaseModel):
+    accounts: List[AccountResponse]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+
+
+class TransactionListResponse(BaseModel):
+    transactions: List[TransactionResponse]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+
+
+class LedgerListResponse(BaseModel):
+    ledgers: List[LedgerResponse]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None
+
+
+class TrancheListResponse(BaseModel):
+    tranches: List[TrancheResponse]
+    total: Optional[int] = None
+    limit: Optional[int] = None
+    offset: Optional[int] = None
+    next_cursor: Optional[str] = None
+    prev_cursor: Optional[str] = None

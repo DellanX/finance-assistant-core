@@ -112,7 +112,7 @@ def test_create_provider_constructor_fallbacks(monkeypatch, tmp_path):
         assert r.status_code == 200
         pid = r.json().get("id")
         # ensure file exists in mock_data
-        providers_dir = Path(__file__).resolve().parents[3] / "app" / "providers" / "mock" / "mock_data"
+        providers_dir = Path.cwd() / "app" / "providers" / "mock" / "mock_data"
         target = providers_dir / f"{pid}.json"
         assert target.exists()
         # cleanup

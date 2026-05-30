@@ -3,7 +3,8 @@ def test_transactions_and_portfolio_values(client, mock_provider):
     tx_res = client.get('/api/v1/transactions')
     assert tx_res.status_code == 200
     txs = tx_res.json()
-    assert any(t.get('id') == 'tx_c1' for t in txs)
+    tx_list = txs.get("transactions") or txs
+    assert any(t.get('id') == 'tx_c1' for t in tx_list)
 
     # Fetch portfolio summary and holdings
     pf_res = client.get('/api/v1/portfolios')

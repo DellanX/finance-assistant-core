@@ -6,8 +6,16 @@ from app.providers.coordinator import BaseCoordinator
 from app.providers import registry
 
 class MockProvider(BaseProvider):
-    def __init__(self, config_path: str):
+    def __init__(self, config_path: str, coordinator_factory=None, write_json_fn=None, load_state_fn=None):
+        """Mock provider backed by a JSON file.
+
+        Tests may pass `coordinator_factory` (callable(provider)->coord),
+        `write_json_fn(path, data)` to avoid filesystem writes, and
+        `load_state_fn(path)->dict` to control loading behavior.
+        """
         self.config_path = config_path
+        self._write_json_fn = write_json_fn
+        self._load_state_fn = load_state_fn
         self._state = self._load_state()
         self.id = self._state.get("id", "unknown_mock_provider")
         self.name = self._state.get("name", "Unknown Mock Provider")
@@ -18,15 +26,32 @@ class MockProvider(BaseProvider):
             except Exception:
                 pass
 
-        self.coordinator = BaseCoordinator(update_fn=_reload_state, update_interval=30, name=f"mock:{self.id}")
+        if coordinator_factory is not None:
+            try:
+                self.coordinator = coordinator_factory(self)
+            except Exception:
+                # fallback to default coordinator
+                self.coordinator = BaseCoordinator(update_fn=_reload_state, update_interval=30, name=f"mock:{self.id}")
+        else:
+            self.coordinator = BaseCoordinator(update_fn=_reload_state, update_interval=30, name=f"mock:{self.id}")
 
     def _load_state(self) -> Dict[str, Any]:
+        if self._load_state_fn is not None:
+            try:
+                return self._load_state_fn(self.config_path)
+            except Exception:
+                pass
         if not os.path.exists(self.config_path):
             return {"id": "error", "name": "Error Loading Provider", "accounts": [], "transactions": {}, "positions": {}}
         with open(self.config_path, "r") as f:
             return json.load(f)
             
     def _save_state(self):
+        if self._write_json_fn is not None:
+            try:
+                return self._write_json_fn(self.config_path, self._state)
+            except Exception:
+                pass
         with open(self.config_path, "w") as f:
             json.dump(self._state, f, indent=4)
 

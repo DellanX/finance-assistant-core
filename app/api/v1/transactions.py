@@ -7,9 +7,12 @@ from app.api.v1.schemas import TransactionResponse
 router = APIRouter()
 
 
-@router.get("", response_model=list[TransactionResponse])
-async def get_transactions(ledger_id: Optional[str] = None):
-    all_txs: list[TransactionResponse] = []
+from app.api.v1.schemas import TransactionResponse
+
+
+@router.get("")
+async def get_transactions(ledger_id: Optional[str] = None, limit: int = None, offset: int = None, page: int = None, cursor: str = None, sort_by: str = "date", order: str = "desc"):
+    all_txs: list[dict] = []
     for provider_id, provider in active_providers.items():
         accounts = await provider.discover_accounts()
         for acc in accounts:
@@ -40,19 +43,29 @@ async def get_transactions(ledger_id: Optional[str] = None):
                     except Exception:
                         t = {"id": getattr(tx, "id", ""), "amount": getattr(tx, "amount", 0)}
 
-                tr = TransactionResponse(
-                    id=t.get("id"),
-                    date=t.get("date"),
-                    amount=t.get("amount", 0.0),
-                    merchant=t.get("merchant"),
-                    status=t.get("status", "unknown"),
-                    ledger_id=acc_id,
-                    ledger_name=accd.get("name"),
-                    provider_id=provider_id,
-                    provider_name=provider.name,
-                )
+                tr = {
+                    "id": t.get("id"),
+                    "date": t.get("date"),
+                    "amount": t.get("amount", 0.0),
+                    "merchant": t.get("merchant"),
+                    "status": t.get("status", "unknown"),
+                    "ledger_id": acc_id,
+                    "ledger_name": accd.get("name"),
+                    "provider_id": provider_id,
+                    "provider_name": provider.name,
+                }
                 all_txs.append(tr)
-    # Sort transactions by date descending
-    all_txs.sort(key=lambda x: x.date or "", reverse=True)
-    return all_txs
+
+    # Sort transactions by requested sort (default date desc)
+    from app.api.utils.pagination import sort_items, apply_filters, normalize_pagination, paginate_items, build_paginated_response
+
+    # convert date to string if None for stable sorting
+    sorted_items = sort_items(all_txs, sort_by, order)
+
+    # If no pagination params provided, preserve legacy behavior and return list of TransactionResponse
+    # Always return envelope-shaped TransactionListResponse
+    lim, off = normalize_pagination(limit, offset, page, cursor)
+    slice_items = paginate_items(sorted_items, lim, off)
+    pag = build_paginated_response(slice_items, total=len(sorted_items), limit=lim, offset=off)
+    return {"transactions": pag["items"], "total": pag["total"], "limit": pag["limit"], "offset": pag["offset"], "next_cursor": pag.get("next_cursor"), "prev_cursor": pag.get("prev_cursor")}
 

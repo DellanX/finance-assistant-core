@@ -1,5 +1,21 @@
 from fastapi import APIRouter
-from app.api.v1 import transactions, portfolios, tranches, ledgers, providers, strategies, snapshots, mock, health, schemas, actions, categories, tags, labels
+from app.api.v1 import (
+	transactions,
+	portfolios,
+	tranches,
+	ledgers,
+	providers,
+	strategies,
+	snapshots,
+	mock,
+	health,
+	schemas,
+	actions,
+	categories,
+	tags,
+	labels,
+	reconciliation,
+)
 
 api_router = APIRouter()
 
@@ -17,3 +33,4 @@ api_router.include_router(snapshots.router, prefix="/v1/snapshots", tags=["snaps
 api_router.include_router(mock.router, prefix="/v1/mock", tags=["mock"])
 api_router.include_router(health.router, prefix="/v1", tags=["health"])
 api_router.include_router(schemas.router, prefix="/v1/schemas", tags=["schemas"])
+api_router.include_router(reconciliation.router, prefix="/v1/reconciliation", tags=["reconciliation"])

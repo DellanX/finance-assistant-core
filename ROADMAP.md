@@ -17,6 +17,7 @@ Phase 0 — Foundation (Immediate)
   - GitHub Actions workflow for tests and lint
   - Conventions doc: API style (CRUD + action endpoints), naming, module layout
 - Success criteria: tests run in CI; new PRs must include tests for changed behavior.
+ - Documentation requirement: all public APIs must include OpenAPI-compatible documentation (Pydantic models, response models and descriptions). This is required for Phase 1/2 acceptance and must be verified by tests that load `/openapi.json`.
 
 Phase 1 — Core API & Provider Layer
 - Objectives: implement full CRUD for primary resources and stabilize provider registry APIs.
@@ -31,6 +32,7 @@ Phase 2 — Normalization, Correction & Allocation Engine
 - Objectives: implement data normalization, reconciliation (correction layer), and allocation engine.
 - Deliverables:
   - Normalizers/adapters per-provider with unit tests and sample fixtures
+  - Pagination/filtering/sorting: all list endpoints MUST support pagination, filtering and sorting parameters (e.g., `limit`, `offset`/`page`, filter query params, `sort_by`, `order`). APIs should return pagination metadata (total, limit, offset/page) and support predictable sorting for stable paging. Tests must cover these behaviors.
   - Reconciliation layer: optimistic transactions, patching API, and cost-basis reconstruction
   - Allocation engine: declarative rules (percentage/priority), allocation records, allocation history API
   - Tests: allocation rules unit tests, allocation integration test (income -> allocations)
@@ -52,6 +54,28 @@ Phase 4 — Integrations & Home Assistant Add-on
   - Home Assistant add-on Docker image and mapping to HA entities/events
   - Websocket channel for live events and strategy previews
 - Success criteria: at least two production integrations with CI-verified adapters and HA add-on artifact.
+
+Device / Entity work (Home Assistant alignment)
+- Objective: provide a simple, well-scoped device->entity registration model so providers can expose user-facing state to Home Assistant without flooding it with low-level objects.
+- Entity types to support initially: `ledger`, `portfolio`, `budget`, `tranche`.
+- Explicit exclusion: `transactions` and `assets` are NOT Home Assistant entities — they remain API resources and data model primitives.
+
+Deliverables (Phase 4 additions):
+- Define a lightweight provider API for registering devices and entities (in-memory registry + persistent metadata when providers are persisted).
+- Implement `Device` and `Entity` models in `app.providers` (Pydantic models + persistence hooks where applicable).
+- Wire provider startup/registry so providers can call `register_device()` and `device.register_entity()` during initialization or sync.
+- Add OpenAPI docs and simple API endpoints to list provider devices and their entities (for UI and HA add-on discovery).
+- Update Home Assistant add-on mapping documentation and HA discovery payload examples.
+
+Short-term implementation steps (first sprint):
+1. Add `Device` and `Entity` Pydantic models and a small registry in `app/providers/registry.py` (or extend existing registry) with `register_device()` and `register_entity()` APIs.
+2. Add tests for registration flows and ensure `transactions`/`assets` do not appear in entity lists.
+3. Expose a read-only API endpoint: `/v1/providers/{id}/devices` that returns devices and their entities for HA discovery.
+4. Update at least one provider (e.g., `envelope_budget`) to register a device and corresponding `budget` entity.
+
+Success criteria (Phase 4 updated):
+- Providers can register devices and entities and those appear via the API and HA discovery payloads.
+- Tests verify entity types and that transactions/assets are not exported as entities.
 
 Phase 5 — Frontend & UX
 - Objectives: dashboard, strategy editor, provider management UI.
@@ -79,3 +103,10 @@ Immediate next actions (short-term)
 - Finalize mapping of existing API modules to FEATURE requirements (gap report).
 - Create minimal CI workflow to run tests when PRs are opened.
 - Draft a contributor/dev guide describing how to add providers, tests, and API routes.
+
+Testability / Refactor Task
+- If provider tests are brittle due to dynamic discovery, coordinators, or filesystem I/O, plan a small refactor:
+  - Introduce dependency-injection hooks for provider constructors (accept coordinator_factory, persistence helper).
+  - Centralize integration discovery behind a simple facade that can be mocked in tests.
+  - Extract file I/O to an injectable persistence helper so tests can use `tmp_path` or in-memory storage.
+  - Add migration notes and a lightweight compatibility adapter to avoid breaking runtime behavior.

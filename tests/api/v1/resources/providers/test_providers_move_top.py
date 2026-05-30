@@ -16,8 +16,8 @@ def test_get_providers_includes_mock(client, mock_provider):
     r = client.get("/api/v1/providers")
     assert r.status_code == 200
     data = r.json()
-    assert isinstance(data, list)
-    ids = {p["id"] for p in data}
+    assert "providers" in data and isinstance(data["providers"], list)
+    ids = {p["id"] for p in data["providers"]}
     assert mock_provider.get("id") in ids
 
 
@@ -26,8 +26,8 @@ def test_get_provider_accounts(client, mock_provider):
     r = client.get(f"/api/v1/providers/{pid}/accounts")
     assert r.status_code == 200
     data = r.json()
-    assert isinstance(data, list)
-    assert len(data) > 0
+    assert "accounts" in data and isinstance(data["accounts"], list)
+    assert len(data["accounts"]) > 0
 
 
 def test_get_provider_metadata_not_found(client):
@@ -59,7 +59,7 @@ def test_create_provider_mock_fallback_and_cleanup(client, tmp_path):
     assert pid is not None
 
     # ensure provider file exists in mock_data
-    providers_dir = Path(__file__).resolve().parents[3] / "app" / "providers" / "mock" / "mock_data"
+    providers_dir = Path.cwd() / "app" / "providers" / "mock" / "mock_data"
     target = providers_dir / f"{pid}.json"
     assert target.exists()
 
