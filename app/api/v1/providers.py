@@ -1,5 +1,4 @@
 from fastapi import APIRouter, HTTPException
-from app.providers.registry import active_providers, provider_configs, get_provider, get_provider_config, list_integration_packages, add_provider, register_provider_config, persist_provider_config
 import app.providers.registry as registry
 import os
 import inspect
@@ -19,8 +18,20 @@ from .types import (
 from typing import List, Dict, Any
 from fastapi import Response
 from app.api.v1.schemas import AccountResponse
+from app.providers.persistence import remove_file
 
 router = APIRouter()
+
+# Backwards-compatible aliases to registry internals. Tests and older callers
+# may patch these names on this module, so keep them exported here.
+get_provider = registry.get_provider
+get_provider_config = registry.get_provider_config
+list_integration_packages = registry.list_integration_packages
+add_provider = registry.add_provider
+register_provider_config = registry.register_provider_config
+persist_provider_config = registry.persist_provider_config
+active_providers = registry.active_providers
+provider_configs = registry.provider_configs
 
 
 def _provider_integration(provider) -> str:
@@ -43,13 +54,25 @@ def _provider_integration(provider) -> str:
 @router.get("", response_model=List[ProviderListItem])
 def get_providers():
     result = []
-    for pid, p in active_providers.items():
+    for pid, p in registry.active_providers.items():
         result.append({"id": pid, "name": getattr(p, "name", None), "integration": _provider_integration(p)})
     return result
 
+
+@router.get("/schemas")
+def list_provider_schemas():
+    # Deprecated here: schema endpoints moved to /api/v1/schemas/providers
+    raise HTTPException(status_code=410, detail="moved to /api/v1/schemas/providers")
+
+
+@router.get("/schemas/{integration}")
+def get_integration_schema(integration: str):
+    # Deprecated here: schema endpoints moved to /api/v1/schemas/providers/{integration}
+    raise HTTPException(status_code=410, detail="moved to /api/v1/schemas/providers/{integration}")
+
 @router.get("/{id}/accounts", response_model=List[AccountResponse])
 async def get_provider_accounts(id: str):
-    provider = get_provider(id)
+    provider = registry.get_provider(id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
     accounts = await provider.discover_accounts()
@@ -87,7 +110,7 @@ def get_provider_metadata(id: str):
 
 @router.get("/{id}/config/schema", response_model=ProviderSchemaResponse)
 def get_provider_schema(id: str):
-    cfg = get_provider_config(id)
+    cfg = registry.get_provider_config(id)
     if cfg is None:
         raise HTTPException(status_code=404, detail="Provider config not found")
     return {"provider_id": id, "schema": cfg.schema}
@@ -95,7 +118,7 @@ def get_provider_schema(id: str):
 
 @router.get("/{id}/config", response_model=ProviderConfigModel)
 def get_provider_config_endpoint(id: str):
-    cfg = get_provider_config(id)
+    cfg = registry.get_provider_config(id)
     if cfg is None:
         raise HTTPException(status_code=404, detail="Provider config not found")
     return ProviderConfigModel(config=cfg.data)
@@ -126,7 +149,7 @@ def update_provider_config(id: str, payload: ProviderConfigModel):
 
 @router.delete("/{id}", status_code=204)
 async def delete_provider(id: str):
-    provider = get_provider(id)
+    provider = registry.get_provider(id)
     if not provider:
         raise HTTPException(status_code=404, detail="Provider not found")
 
@@ -144,36 +167,24 @@ async def delete_provider(id: str):
     # provider-specific cleanup: remove config file if exists
     try:
         ppath = getattr(provider, "config_path", None)
-        if ppath and os.path.exists(ppath):
-            os.remove(ppath)
+        if ppath:
+            remove_file(ppath)
     except Exception:
         pass
 
     # remove from registry collections
     try:
-        if id in active_providers:
-            del active_providers[id]
+        if id in registry.active_providers:
+            del registry.active_providers[id]
     except Exception:
         pass
     try:
-        if id in provider_configs:
-            del provider_configs[id]
+        if id in registry.provider_configs:
+            del registry.provider_configs[id]
     except Exception:
         pass
 
     return Response(status_code=204)
-
-
-@router.get("/schemas")
-def list_provider_schemas():
-    # Deprecated here: schema endpoints moved to /api/v1/schemas/providers
-    raise HTTPException(status_code=410, detail="moved to /api/v1/schemas/providers")
-
-
-@router.get("/schemas/{integration}")
-def get_integration_schema(integration: str):
-    # Deprecated here: schema endpoints moved to /api/v1/schemas/providers/{integration}
-    raise HTTPException(status_code=410, detail="moved to /api/v1/schemas/providers/{integration}")
 
 
 @router.post("", response_model=ProviderResponse)
@@ -189,7 +200,7 @@ def create_provider(payload: ProviderCreateRequest):
     if not integration:
         raise HTTPException(status_code=400, detail="integration is required")
 
-    if integration not in list_integration_packages():
+    if integration not in registry.list_integration_packages():
         raise HTTPException(status_code=404, detail="integration not found")
 
     cfg = payload.config or {}
@@ -204,7 +215,7 @@ def create_provider(payload: ProviderCreateRequest):
             # if provider factory also returned config info, try to register
             pid = getattr(provider, "id", None)
             config_obj = ProviderConfig(provider_id=pid, data=cfg)
-            add_provider(provider, config_obj)
+            registry.add_provider(provider, config_obj)
             # Return typed ProviderResponse
             return ProviderResponse(id=pid, name=getattr(provider, "name", name), integration=integration)
     except Exception:
@@ -278,7 +289,7 @@ def create_provider(payload: ProviderCreateRequest):
             except Exception:
                 config_obj = ProviderConfig(provider_id=pid, data=cfg)
 
-            add_provider(provider, config_obj)
+            registry.add_provider(provider, config_obj)
 
             # Return typed ProviderResponse
             return ProviderResponse(id=pid, name=getattr(provider, "name", name), integration=integration)

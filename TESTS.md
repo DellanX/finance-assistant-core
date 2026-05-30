@@ -42,6 +42,23 @@ Fixtures
   - `mock_provider` fixture (creates disposable mock provider JSON and registers it in `app.providers.registry`)
   - `tmp_path` usage for filesystem isolation
 
+Coordinator lifecycle in tests
+- The test suite includes a `coordinator_factory` fixture that returns a lightweight
+  `TestCoordinator` suitable for tests. To avoid starting real background loops,
+  production `BaseCoordinator` tasks are not started by default.
+- Tests that need provider coordinators should opt in by using the `apply_coordinator_factory`
+  fixture. Example:
+
+  ```python
+  def test_something_with_coordinator(apply_coordinator_factory, mock_provider):
+      # apply_coordinator_factory attaches TestCoordinator instances to providers
+      # and ensures they are stopped at test teardown.
+      pid = mock_provider.get("id")
+      # exercise coordinator-dependent behavior here
+  ```
+
+  Making `apply_coordinator_factory` opt-in keeps most tests fast and deterministic.
+
 CI Notes
 - Run `pytest -q` in CI on PRs. Use caching for dependencies.
 - Use markers (`@pytest.mark.integration`) to gate longer integration tests.

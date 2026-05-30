@@ -12,13 +12,13 @@ def test_mock_provider_basic(mock_provider):
 
     # discover accounts
     import asyncio
-    accounts = asyncio.get_event_loop().run_until_complete(provider.discover_accounts())
+    accounts = asyncio.run(provider.discover_accounts())
     assert isinstance(accounts, list)
     # Ensure at least one account exists
     assert len(accounts) > 0
 
     # sync transactions for first account
-    txs = asyncio.get_event_loop().run_until_complete(provider.sync_transactions(accounts[0]))
+    txs = asyncio.run(provider.sync_transactions(accounts[0]))
     assert isinstance(txs, list)
     # some fixtures include 'tx_c1' or similar ids
     def _tx_id(t):
@@ -31,7 +31,7 @@ def test_mock_provider_basic(mock_provider):
     assert any(isinstance(_tx_id(t), str) for t in txs) or txs == []
 
     # sync positions
-    pos = asyncio.get_event_loop().run_until_complete(provider.sync_positions(accounts[0]))
+    pos = asyncio.run(provider.sync_positions(accounts[0]))
     assert isinstance(pos, list)
     # if positions exist, ensure they have a symbol
     def _pos_symbol(p):

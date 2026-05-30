@@ -2,9 +2,9 @@ import importlib
 import os
 from typing import Dict
 from app.providers.base import BaseProvider
-import json
 import inspect
 from app.providers.config import ProviderConfig
+from app.providers.persistence import write_json_file
 
 # Global registry of active providers
 active_providers: Dict[str, BaseProvider] = {}
@@ -184,9 +184,8 @@ def persist_provider_config(provider_id: str) -> bool:
         ppath = getattr(provider, "config_path", None)
         if ppath:
             try:
-                with open(ppath, "w") as f:
-                    json.dump(cfg.data, f, indent=4)
-                return True
+                if write_json_file(ppath, cfg.data):
+                    return True
             except Exception:
                 pass
 
@@ -200,9 +199,8 @@ def persist_provider_config(provider_id: str) -> bool:
         path = inspect.getfile(cls)
         pkg_dir = os.path.dirname(path)
         target = os.path.join(pkg_dir, "config.json")
-        with open(target, "w") as f:
-            json.dump(cfg.data, f, indent=4)
-        return True
+        if write_json_file(target, cfg.data):
+            return True
     except Exception:
         return False
 
@@ -210,14 +208,23 @@ def persist_provider_config(provider_id: str) -> bool:
 def list_providers():
     return list(active_providers.values())
 
-def start_all_coordinators():
+def start_all_coordinators(coordinator_factory=None):
     """Start any provider coordinators that expose a `start()` method.
 
-    This is intended to be called on application startup and is synchronous
-    because coordinators manage their own asyncio tasks.
+    If `coordinator_factory` is provided, it will be called for providers
+    that do not already expose a `coordinator` attribute. This makes the
+    lifecycle injectable for tests (pass a TestCoordinator factory).
     """
     for provider_id, provider in active_providers.items():
         coord = getattr(provider, "coordinator", None)
+        # If a factory is provided, prefer it and replace any existing coordinator
+        if coordinator_factory is not None:
+            try:
+                coord = coordinator_factory(provider)
+                provider.coordinator = coord
+            except Exception:
+                coord = None
+
         if coord and hasattr(coord, "start"):
             try:
                 coord.start()
@@ -225,16 +232,27 @@ def start_all_coordinators():
                 # ignore coordinator start failures to avoid crashing startup
                 pass
 
-async def stop_all_coordinators():
+async def stop_all_coordinators(coordinator_factory=None):
     """Stop any provider coordinators that expose an async `stop()` method.
 
-    This should be awaited during application shutdown.
+    If `coordinator_factory` was used at start time, it can be supplied here
+    for symmetry but is optional. This should be awaited during application
+    shutdown.
     """
     for provider_id, provider in active_providers.items():
         coord = getattr(provider, "coordinator", None)
+        if coord is None and coordinator_factory is not None:
+            try:
+                coord = coordinator_factory(provider)
+                provider.coordinator = coord
+            except Exception:
+                coord = None
+
         if coord and hasattr(coord, "stop"):
             try:
-                await coord.stop()
+                res = coord.stop()
+                if inspect.iscoroutine(res):
+                    await res
             except Exception:
                 pass
 

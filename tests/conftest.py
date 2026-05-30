@@ -21,6 +21,37 @@ def noop_registry_start_stop(monkeypatch):
 
 
 @pytest.fixture
+def coordinator_factory():
+    """Return a simple TestCoordinator factory for use in tests."""
+    from app.providers.coordinator import TestCoordinator
+
+    def factory(provider):
+        return TestCoordinator()
+
+    return factory
+
+
+@pytest.fixture
+def apply_coordinator_factory(coordinator_factory):
+    """Reload the registry and start coordinators using the provided factory.
+
+    This bypasses the autouse no-op in tests so specific tests can exercise
+    coordinator lifecycle behavior without starting real background tasks.
+    """
+    import importlib, asyncio
+    from app.providers import registry
+
+    # reload to restore original functions if they've been monkeypatched
+    importlib.reload(registry)
+    registry.start_all_coordinators(coordinator_factory=coordinator_factory)
+    try:
+        yield
+    finally:
+        # ensure coordinators are stopped on teardown
+        asyncio.run(registry.stop_all_coordinators(coordinator_factory=coordinator_factory))
+
+
+@pytest.fixture
 def client():
     """TestClient for the FastAPI app."""
     with TestClient(app_main.app) as client:

@@ -1,0 +1,5 @@
+{
+    "enable_balances": true,
+    "enable_transactions": true,
+    "enable_budgets": false
+}

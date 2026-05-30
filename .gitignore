@@ -97,3 +97,6 @@ celerybeat-schedule
 
 # Ignore system files
 Thumbs.db
+
+# Ignore mock provider generated data
+/app/providers/mock/mock_data/

@@ -1,3 +1,70 @@
+"""Coordinator helpers for providers.
+
+`BaseCoordinator.start()` will only schedule its background loop when an
+asyncio event loop is already running. This avoids creating orphaned tasks in
+synchronous test contexts (for example, when test suites import provider
+modules but do not run an event loop). Test code should use the `coordinator_factory`
+fixture to attach `TestCoordinator` instances to providers when tests need a
+coordinator without running real background loops.
+"""
+
+from typing import Any, Callable, Optional
+
+
+class CoordinatorInterface:
+    """Minimal coordinator interface used by the registry and tests.
+
+    Implementations should provide `start()`, `stop()` and optional `refresh()`.
+    Methods may be sync or async; callers should handle coroutines.
+    """
+
+    def start(self) -> Any:
+        raise NotImplementedError()
+
+    async def stop(self) -> Any:
+        raise NotImplementedError()
+
+    def refresh(self) -> Any:
+        raise NotImplementedError()
+
+
+class TestCoordinator(CoordinatorInterface):
+    """A simple synchronous coordinator useful for tests.
+
+    It records whether it's running and provides sync wrappers for lifecycle.
+    """
+
+    def __init__(self):
+        self.is_running = False
+
+    def start(self):
+        self.is_running = True
+
+    async def stop(self):
+        self.is_running = False
+
+    def refresh(self):
+        # no-op; tests may override this attribute
+        return None
+
+
+def ensure_coordinator(provider: Any, factory: Optional[Callable[[Any], CoordinatorInterface]] = None) -> CoordinatorInterface:
+    """Ensure `provider.coordinator` exists.
+
+    If `factory` is provided, it will be called with the provider to produce a coordinator.
+    If provider already has a coordinator, it's returned as-is.
+    """
+    coord = getattr(provider, "coordinator", None)
+    if coord is not None:
+        return coord
+    if factory is not None:
+        coord = factory(provider)
+        provider.coordinator = coord
+        return coord
+    # default: attach a TestCoordinator so tests don't start background tasks
+    coord = TestCoordinator()
+    provider.coordinator = coord
+    return coord
 
 import asyncio
 import logging
@@ -55,7 +122,13 @@ class BaseCoordinator:
         if self._task is None:
             logger.info("%s: starting coordinator", self.name)
             self._stopping = False
-            loop = asyncio.get_event_loop()
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                # No running loop in this thread/context — do not start background task.
+                logger.debug("%s: no running event loop, deferring start", self.name)
+                return
+            # schedule the coordinator loop on the running event loop
             self._task = loop.create_task(self._loop())
 
     async def stop(self):
